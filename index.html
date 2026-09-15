@@ -319,7 +319,7 @@ function getCurrentPassword() {
 }
 
 function requestEditMode() {
-    const password = prompt("ENTER TERMINAL ACCESS PASSWORD:");
+    const password = prompt("");
     if (password === null) return;
     if (password === getCurrentPassword()) {
         enableEditing();
