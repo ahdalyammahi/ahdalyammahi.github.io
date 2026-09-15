@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Profile & Applications</title>
+    <title id="pageBrowserTitle">My Profile & Applications</title>
     <style>
         :root {
             --bg-color: #0f172a;
@@ -96,6 +96,25 @@
             background-color: var(--danger-color);
             color: #ffffff;
             border: none;
+        }
+
+        /* Browser Title Edit Bar */
+        .browser-title-wrapper {
+            display: none;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .browser-title-wrapper span {
+            color: var(--text-color);
+            font-weight: 500;
+            border-bottom: 1px dashed var(--accent-color);
+            padding-bottom: 2px;
         }
 
         /* Header Section */
@@ -221,6 +240,17 @@
             border-radius: 4px;
         }
 
+        body.editing a {
+            cursor: pointer;
+            position: relative;
+        }
+
+        body.editing a::after {
+            content: " [Edit URL]";
+            font-size: 0.75rem;
+            color: var(--accent-color);
+        }
+
         .edit-controls {
             display: none;
             position: fixed;
@@ -268,8 +298,13 @@
     <div class="container">
         <!-- Top Controls -->
         <div class="controls-bar">
-            <button class="btn" id="themeToggle" onclick="toggleTheme()">🌓 Theme</button>
-            <button class="btn btn-primary" id="editModeBtn" onclick="requestEditMode()">🔒 Edit Page</button>
+            <button class="btn" id="themeToggle" onclick="toggleTheme()">Theme</button>
+            <button class="btn btn-primary" id="editModeBtn" onclick="requestEditMode()">Edit Page</button>
+        </div>
+
+        <!-- Browser Title Edit Container (Visible only in edit mode) -->
+        <div class="browser-title-wrapper" id="browserTitleWrapper">
+            Browser Head Title: <span id="browserTitleEdit" contenteditable="true">My Profile & Applications</span>
         </div>
 
         <!-- Header Content -->
@@ -280,7 +315,7 @@
 
         <!-- Applications List Section -->
         <section id="appsSection">
-            <h2>Web Applications</h2>
+            <h2 id="appsHeading" spellcheck="false">Web Applications</h2>
             <div class="app-grid" id="appGrid">
                 <!-- App Card 1 -->
                 <div class="app-card">
@@ -317,7 +352,7 @@
                 &copy; 2026 Ahmed Alyammahi. All rights reserved.
             </div>
             <div class="hosting-info" id="hostingInfo" spellcheck="false">
-                Hosted with GitHub Pages (github.io)
+                This page is made on github.io pages.
             </div>
         </footer>
     </div>
@@ -330,13 +365,18 @@
     </div>
 
     <script>
-        // Load saved content and theme from localStorage on startup
+        // Load saved content, browser title, and theme from localStorage on startup
         window.addEventListener('DOMContentLoaded', () => {
             const savedContent = localStorage.getItem('profileWebsiteContent');
             if (savedContent) {
-                document.getElementById('profileHeader').innerHTML = savedContent.header;
-                document.getElementById('appGrid').innerHTML = savedContent.apps;
-                document.getElementById('pageFooter').innerHTML = savedContent.footer;
+                const data = JSON.parse(savedContent);
+                document.getElementById('profileHeader').innerHTML = data.header;
+                document.getElementById('appsSection').innerHTML = data.apps;
+                document.getElementById('pageFooter').innerHTML = data.footer;
+                if (data.browserTitle) {
+                    document.title = data.browserTitle;
+                    document.getElementById('browserTitleEdit').textContent = data.browserTitle;
+                }
             }
 
             const savedTheme = localStorage.getItem('profileTheme') || 'dark';
@@ -363,12 +403,12 @@
 
         function requestEditMode() {
             const correctPassword = getCurrentPassword();
-            const userPassword = prompt("Enter the password to edit this page (Format: DDMMYYYYHHMM based on current date & time):");
+            const userPassword = prompt("Enter password:");
 
             if (userPassword === correctPassword) {
                 enableEditing();
             } else if (userPassword !== null) {
-                alert("Incorrect password. Please verify the current date and time.");
+                alert("Incorrect password.");
             }
         }
 
@@ -376,16 +416,18 @@
             document.body.classList.add('editing');
             document.getElementById('editModeBtn').style.display = 'none';
             document.getElementById('editControls').classList.add('active');
+            document.getElementById('browserTitleWrapper').style.display = 'block';
             document.getElementById('addAppContainer').style.display = 'block';
 
             // Make elements contenteditable
             const elementsToEdit = [
-                'profileName', 'profileDescription', 'socialLinks', 
-                'copyrightDisclaimer', 'hostingInfo'
+                'profileName', 'profileDescription', 'appsHeading', 
+                'socialLinks', 'copyrightDisclaimer', 'hostingInfo', 'browserTitleEdit'
             ];
 
             elementsToEdit.forEach(id => {
-                document.getElementById(id).setAttribute('contenteditable', 'true');
+                const el = document.getElementById(id);
+                if (el) el.setAttribute('contenteditable', 'true');
             });
 
             // Make app cards editable
@@ -393,6 +435,21 @@
                 el.setAttribute('contenteditable', 'true');
             });
         }
+
+        // Handle hyperlink URL editing when clicking any link in edit mode
+        document.addEventListener('click', function(e) {
+            if (document.body.classList.contains('editing')) {
+                const link = e.target.closest('a');
+                if (link) {
+                    e.preventDefault();
+                    const currentHref = link.getAttribute('href') || '#';
+                    const newHref = prompt("Enter new URL for this link:", currentHref);
+                    if (newHref !== null) {
+                        link.setAttribute('href', newHref);
+                    }
+                }
+            }
+        });
 
         function addNewApp() {
             const grid = document.getElementById('appGrid');
@@ -417,28 +474,32 @@
         }
 
         function saveChanges() {
-            // Disable contenteditable before saving markup
             disableEditingState();
 
             const headerHTML = document.getElementById('profileHeader').innerHTML;
-            const appsHTML = document.getElementById('appGrid').innerHTML;
+            const appsHTML = document.getElementById('appsSection').innerHTML;
             const footerHTML = document.getElementById('pageFooter').innerHTML;
+            const browserTitle = document.getElementById('browserTitleEdit').textContent;
+
+            document.title = browserTitle;
 
             const contentToSave = {
                 header: headerHTML,
                 apps: appsHTML,
-                footer: footerHTML
+                footer: footerHTML,
+                browserTitle: browserTitle
             };
 
             localStorage.setItem('profileWebsiteContent', JSON.stringify(contentToSave));
             document.getElementById('editControls').classList.remove('active');
             document.getElementById('editModeBtn').style.display = 'inline-flex';
+            document.getElementById('browserTitleWrapper').style.display = 'none';
             document.getElementById('addAppContainer').style.display = 'none';
-            alert("Changes saved successfully to your browser storage!");
+            alert("Changes saved successfully to browser storage!");
         }
 
         function cancelEditing() {
-            location.reload(); // Reloads original state or last saved state
+            location.reload();
         }
 
         function disableEditingState() {
